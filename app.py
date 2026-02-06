@@ -2,45 +2,31 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Dashboard Ministério", layout="wide")
 
-# --- 2. CARREGAMENTO E LIMPEZA DE DADOS ---
 @st.cache_data
 def carregar_dados():
-    # A. Carregar Execução (Histórico)
     df_exec = pd.read_csv("DADOS_DASHBOARD_FINAL.csv")
     df_exec = df_exec.dropna(subset=['ID_MUSICA'])
-    
-    # B. Carregar Acervo (Total)
     df_acervo = pd.read_csv("ADOLESCENTES - MUSICAS.csv")
-    # Padroniza nome da chave ID (remove acento se houver)
     df_acervo = df_acervo.rename(columns={'ID_MÚSICA': 'ID_MUSICA'})
     
-    # --- FAXINA DE DADOS (Resolve o problema "NOVA" vs "NOVA ") ---
     def limpar_texto(df):
-        # Colunas que são texto e precisam de padronização
         cols_texto = ['MÚSICA', 'AUTOR_MUSICA', 'CLASSIFICACAO_MUSICA']
         for col in cols_texto:
             if col in df.columns:
-                # Converte para texto -> Remove espaços -> Põe em MAIÚSCULO
                 df[col] = df[col].astype(str).str.strip().str.upper()
         return df
 
-    # Aplica a limpeza nas duas tabelas
     df_exec = limpar_texto(df_exec)
     df_acervo = limpar_texto(df_acervo)
     
     return df_exec, df_acervo
 
-# --- AQUI ESTAVA O ERRO ANTERIOR (CORRIGIDO) ---
-# Agora pegamos as duas variáveis corretamente
 df, df_acervo = carregar_dados()
 
-# --- 3. BARRA LATERAL (FILTROS) ---
 st.sidebar.header("Filtros")
 
-# Usamos o Acervo para gerar a lista, pois ele tem todas as opções possíveis
 if "CLASSIFICACAO_MUSICA" in df_acervo.columns:
     lista_classificacao = df_acervo["CLASSIFICACAO_MUSICA"].dropna().unique()
     classificacao_selecionada = st.sidebar.multiselect(
@@ -51,23 +37,19 @@ if "CLASSIFICACAO_MUSICA" in df_acervo.columns:
 else:
     classificacao_selecionada = []
 
-# --- 4. MOTOR DE FILTRAGEM (DUPLO) ---
-df_filtrado = df.copy()          # Cópia para filtrar Execução
-df_acervo_filtrado = df_acervo.copy() # Cópia para filtrar Acervo
+df_filtrado = df.copy()          
+df_acervo_filtrado = df_acervo.copy() 
 
 if classificacao_selecionada:
     df_filtrado = df_filtrado[df_filtrado["CLASSIFICACAO_MUSICA"].isin(classificacao_selecionada)]
     df_acervo_filtrado = df_acervo_filtrado[df_acervo_filtrado["CLASSIFICACAO_MUSICA"].isin(classificacao_selecionada)]
 
-# --- 5. LÓGICA DA FILA (CONJUNTOS) ---
 ids_tocados = set(df_filtrado["ID_MUSICA"].unique())       # Quem já tocou
 ids_totais = set(df_acervo_filtrado["ID_MUSICA"].unique()) # Todos que existem
 ids_nao_tocados = ids_totais - ids_tocados                 # A Diferença
 
-# Cria tabela só com as músicas da fila
 df_fila = df_acervo_filtrado[df_acervo_filtrado["ID_MUSICA"].isin(ids_nao_tocados)]
 
-# --- 6. DASHBOARD (LAYOUT) ---
 st.title("📊 Dashboard de Execução Musical")
 st.markdown("---")
 
@@ -78,7 +60,6 @@ col2.metric("Músicas Diferentes Tocadas", len(ids_tocados))
 col3.metric("Total no Acervo", len(df_acervo_filtrado))
 col4.metric("Na Fila (Nunca Tocadas)", len(df_fila))
 
-# Cálculo seguro para não dividir por zero
 if len(ids_totais) > 0:
     giro = (len(ids_tocados) / len(ids_totais)) * 100
 else:
@@ -87,10 +68,8 @@ col5.metric("Giro do Repertório", f"{giro:.1f}%")
 
 st.markdown("---")
 
-# --- 7. ABAS VISUAIS ---
 aba1, aba2, aba3 = st.tabs(["🎵 Execução", "🎤 Artistas", "💡 Oportunidades (Fila)"])
 
-# ABA 1: O QUE TOCAMOS
 with aba1:
     col_g1, col_g2 = st.columns(2)
     with col_g1:
@@ -108,7 +87,7 @@ with aba1:
             fig_pizza = px.pie(df_filtrado, names="CLASSIFICACAO_MUSICA", hole=0.5)
             st.plotly_chart(fig_pizza, use_container_width=True)
 
-# ABA 2: COMPARATIVO ARTISTAS
+
 with aba2:
     col_art1, col_art2 = st.columns(2)
     
@@ -131,7 +110,6 @@ with aba2:
         fig_acervo.update_layout(yaxis=dict(autorange="reversed"))
         st.plotly_chart(fig_acervo, use_container_width=True)
 
-# ABA 3: A FILA (OPORTUNIDADES)
 with aba3:
     st.subheader(f"Raio-X da Fila: {len(df_fila)} músicas disponíveis")
     
@@ -154,8 +132,7 @@ with aba3:
             )
             fig_art_fila.update_layout(yaxis=dict(autorange="reversed"))
             st.plotly_chart(fig_art_fila, use_container_width=True)
-            
-        # Gráfico Estilos na Fila
+
         with col_f2:
             st.markdown("##### 🎸 Estilos parados")
             if "CLASSIFICACAO_MUSICA" in df_fila.columns:
